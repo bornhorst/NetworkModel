@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.29209.62
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NetworkModel", "NetworkModel\NetworkModel.csproj", "{C7309560-D718-4B10-B87C-4F37E25C360F}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NetworkProject", "NetworkModel\NetworkProject.csproj", "{C7309560-D718-4B10-B87C-4F37E25C360F}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
