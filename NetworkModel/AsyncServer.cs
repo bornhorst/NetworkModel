@@ -7,73 +7,102 @@ using System.Threading;
 
 namespace NetworkProject
 {
-    public class serverReceiveBuffer
+    public class AsyncServer : ISocket
     {
-        // Client
-        public Socket clientSocket = null;
-        // Receive buffer size
-        public const int bufferSize = 1024;
-        // Byte allocated buffer
-        public byte[] buffer = new byte[bufferSize];
-        // Message string received
-        public StringBuilder sb = new StringBuilder();
-    }
+        // Setup ManualResetEvent Signals
+        private static ManualResetEvent acceptDone = new ManualResetEvent(false);
+        private static ManualResetEvent sendDone = new ManualResetEvent(false);
+        private static ManualResetEvent receiveDone = new ManualResetEvent(false);
 
-    public class AsyncServer
-    {
-        // Signal for server thread loop
-        public static ManualResetEvent finished = new ManualResetEvent(false);
+        // Interface Properties
+        private static IPHostEntry _IPHostInfo;
+        private static IPAddress _IPHostAddress;
+        private static IPEndPoint _IPHostEndPoint;
 
-        // Client connections
-        private const int MAX_CLIENTS = 3;
-        private static int clientsConnected = 0;
+        private Socket server = null;
+
+        private readonly object dataLock = new object();
+
+        // Interface Get/Set Properties
+        IPHostEntry ISocket.IPHostInfo
+        {
+            get
+            {
+                return _IPHostInfo;
+            }
+            set
+            {
+                _IPHostInfo = value;
+            }
+        }
+        IPAddress ISocket.IPHostAddress
+        {
+            get
+            {
+                return _IPHostAddress;
+            }
+            set
+            {
+                _IPHostAddress = value;
+            }
+        }
+        IPEndPoint ISocket.IPHostEndPoint
+        {
+            get
+            {
+                return _IPHostEndPoint;
+            }
+            set
+            {
+                _IPHostEndPoint = value;
+            }
+        }
 
         // Server Class Constructor
-        public AsyncServer()
+        public AsyncServer(IPHostEntry IPHostInfo, IPAddress IPHostAddress, IPEndPoint IPHostEndPoint)
         {
-            // Establish connection and listen
-            startListening();
+            // Establish interface properties
+            _IPHostInfo = IPHostInfo;
+            _IPHostAddress = IPHostAddress;
+            _IPHostEndPoint = IPHostEndPoint;
+        }
+
+        ~AsyncServer()
+        {
+            if(server != null)
+                server.Close();
         }
 
         // Set up the server to listen for clients
-        public static void startListening()
+        public void startListening()
         {
-            // Obtain DNS name from host
-            IPHostEntry ipHostInfo = Dns.GetHostEntry(Dns.GetHostName());
-            // Obtain host IP
-            IPAddress ipAddress = ipHostInfo.AddressList[0];
-            // Setup socket port for the server using the host
-            IPEndPoint localEndPoint = new IPEndPoint(ipAddress, 59240);
-
             // Create the TCP/IP socket
-            Socket server = new Socket(ipAddress.AddressFamily, SocketType.Stream,
-                                       ProtocolType.Tcp);
+            server = new Socket(_IPHostAddress.AddressFamily, SocketType.Stream,
+                                ProtocolType.Tcp);
 
             // Bind the socket to port and listen for client connections
             try
             {
                 // Bind the server to the port and listen
-                server.Bind(localEndPoint);
+                server.Bind(_IPHostEndPoint);
                 server.Listen(100);
 
                 // Display local port endpoint and host name
                 Console.WriteLine("Server:> Connect to Local Port : {0}",
                                    ((IPEndPoint)server.LocalEndPoint).Port.ToString());
-                Console.WriteLine("Server:> Host Name : {0}", ipHostInfo.HostName.ToString());
+                Console.WriteLine("Server:> Host Name : {0}", _IPHostInfo.HostName.ToString());
 
-                while (clientsConnected < MAX_CLIENTS)
+                while (true)
                 {
                     // Set to reset state
-                    finished.Reset();
+                    acceptDone.Reset();
 
                     // Start asynchronous listener
                     Console.WriteLine("Server:> Listening for connections...");
                     server.BeginAccept(new AsyncCallback(acceptClient), server);
-                        
-                    // Wait for connection setup before moving on
-                    finished.WaitOne();
 
-                    Thread.Sleep(1000);
+                    // Wait for connection setup before moving on
+                    acceptDone.WaitOne();
                 }
             } catch (Exception e)
             {
@@ -82,80 +111,121 @@ namespace NetworkProject
         }
 
         // Allow server to accept incoming connection
-        public static void acceptClient(IAsyncResult ar)
+        public void acceptClient(IAsyncResult asyncResult)
         {
-            // Set up the client socket handler
-            Socket server = (Socket)ar.AsyncState;
-            Socket handler = server.EndAccept(ar);
+            // Accept new clients or finish
+            acceptDone.Set();
 
-            // Set up the receive buffer
-            serverReceiveBuffer rb = new serverReceiveBuffer();
-            rb.clientSocket = handler;
-            handler.BeginReceive(rb.buffer, 0, serverReceiveBuffer.bufferSize, 0,
-                                    new AsyncCallback(readClient), rb);
+            Socket listener = (Socket)asyncResult.AsyncState;
+            Socket handler = listener.EndAccept(asyncResult);
 
-            ++clientsConnected;
-            // Allow thread to continue accepting new connections
-            finished.Set();
+            socketMessageHandler(handler);
         }
 
-        // Handle the incoming message from the client
-        public static void readClient(IAsyncResult ar)
+        // Handle Messages After Connection Established
+        public void socketMessageHandler(Socket handler)
         {
-            String message = String.Empty;
-
-            // Receive the buffer from async clientSocket
-            serverReceiveBuffer rb = (serverReceiveBuffer)ar.AsyncState;
-            Socket handler = rb.clientSocket;
-
-            // Read in the data from the buffer
-            int bytesRead = handler.EndReceive(ar);
-
-            if(bytesRead > 0)
+            lock (dataLock)
             {
-                // Store data as it comes in
-                rb.sb.Append(Encoding.ASCII.GetString(rb.buffer, 0, bytesRead));
+                socketReceive(handler);
+                receiveDone.WaitOne();
+                socketSend(handler, "Connection Accepted<EOF>");
+                sendDone.WaitOne();
+                socketSend(handler, "Message1<EOF>");
+                sendDone.WaitOne();
+                socketReceive(handler);
+                receiveDone.WaitOne();
+                socketSend(handler, "Message2<EOF>");
+                sendDone.WaitOne();
+                socketReceive(handler);
+                receiveDone.WaitOne();
+                socketSend(handler, "Message3<EOF>");
+                sendDone.WaitOne();
+                socketReceive(handler);
+                receiveDone.WaitOne();
+                socketSend(handler, "Finished<EOF>");
+                sendDone.WaitOne();
+                socketReceive(handler);
+                receiveDone.WaitOne();
+            }
+        }
 
-                // Check for end of transaction, otherwise continue reading
-                message = rb.sb.ToString();
-                if(message.IndexOf("<EOF>") > -1)
+        // Receive Data
+        public void socketReceive(Socket handler)
+        {
+            try
+            {            
+                bufferHandler socketBuffer = new bufferHandler();
+                socketBuffer.WorkSocket = handler;
+                handler.BeginReceive(socketBuffer.WorkBuffer, 0, bufferHandler.bufferSize, 0,
+                                     new AsyncCallback(socketReceiveHandler), socketBuffer);
+                
+            } catch (Exception e)
+            {
+                Console.WriteLine(e.ToString());
+            }
+        }
+
+        // Handle Receiving Data
+        public void socketReceiveHandler(IAsyncResult asyncResult)
+        {
+            String message;
+            try
+            {
+                bufferHandler socketBuffer = (bufferHandler)asyncResult.AsyncState;
+                Socket handler = socketBuffer.WorkSocket;
+                int bytesRead = handler.EndReceive(asyncResult);
+                if(bytesRead > 0)
                 {
-                    // Transaction is finished
-                    Console.WriteLine("Server:> Read {0} bytes from socket. \n" +
-                                      "Server:> Data Read: {1}", message.Length, message);
-                    // Echo back to client
-                    sendData(handler, message);
+                    socketBuffer.WorkString.Append(Encoding.ASCII.GetString(socketBuffer.WorkBuffer,
+                                                                            0, bytesRead));
+                    message = socketBuffer.WorkString.ToString();
+                    if (message.IndexOf("<EOF>") > -1)
+                    {
+                        Console.WriteLine($"Server:> Read {bytesRead} bytes from socket.");
+                        Console.WriteLine($"Server:> Data Read: {message}.");
+                        if (message.Contains("Finished"))
+                            Console.WriteLine("Server:> Goodbye");
+                        receiveDone.Set();
+                    }
+                    else
+                    {
+                        handler.BeginReceive(socketBuffer.WorkBuffer, 0, bufferHandler.bufferSize, 0,
+                                             new AsyncCallback(socketReceiveHandler), socketBuffer);
+                    }
                 } else
                 {
-                    // Still more data incoming
-                    handler.BeginReceive(rb.buffer, 0, serverReceiveBuffer.bufferSize, 0,
-                                         new AsyncCallback(readClient), rb);
-                }
+                    receiveDone.Set();
+                } 
+            } catch (Exception e)
+            {
+                Console.WriteLine(e.ToString());
             }
         }
 
         // Send data as byte array
-        private static void sendData(Socket handler, String data)
+        public void socketSend(Socket handler, String data)
         {
             // Convert string to bytes
             byte[] byteData = Encoding.ASCII.GetBytes(data);
 
             // Start the transaction
             handler.BeginSend(byteData, 0, byteData.Length, 0,
-                              new AsyncCallback(sendClient), handler);
+                              new AsyncCallback(socketSendHandler), handler);
         }
 
         // Handle sending data to the client
-        private static void sendClient(IAsyncResult ar)
+        public void socketSendHandler(IAsyncResult asyncResult)
         {
             try
             {
                 // Setup the handler socket
-                Socket handler = (Socket)ar.AsyncState;
+                Socket handler = (Socket)asyncResult.AsyncState;
 
                 // Send out new data to the client
-                int bytesSent = handler.EndSend(ar);
+                int bytesSent = handler.EndSend(asyncResult);
                 Console.WriteLine("Server:> Sent {0} bytes to client.", bytesSent);
+                sendDone.Set();
 
             } catch(Exception e)
             {

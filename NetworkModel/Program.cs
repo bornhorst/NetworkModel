@@ -1,53 +1,73 @@
 ﻿using System;
 using System.Threading;
+using System.Net;
+using System.Net.Sockets;
 
 namespace NetworkProject
 {
-    class Program
+    public class SocketSetup
     {
-        // Maximum number of client connections
-        const int MAX_CLIENTS = 3;
-        private static readonly AsyncClient[] clientConnection = new AsyncClient[MAX_CLIENTS];
-
-        // Create mutex
-        private static Mutex mutex = new Mutex();
-
-        // Total clients connected
-        private static int clientsConnected = 0;
-
-        // Start a new server connection
+        private static IPHostEntry ipHostInfo { get; set; }
+        private static IPAddress ipAddress { get; set; }
+        private static IPEndPoint ipEndPoint { get; set; }
+        public SocketSetup()
+        {
+            ipHostInfo = Dns.GetHostEntry(Dns.GetHostName());
+            ipAddress = ipHostInfo.AddressList[0];
+            ipEndPoint = new IPEndPoint(ipAddress, 59240);
+        }
+        public IPHostEntry IPHostInfo
+        {
+            get
+            {
+                return ipHostInfo;
+            }
+            set { }
+        }
+        public IPAddress IPHostAddress
+        {
+            get
+            {
+                return ipAddress;
+            }
+            set { }
+        }
+        public IPEndPoint IPHostEndPoint
+        {
+            get
+            {
+                return ipEndPoint;
+            }
+            set { }
+        }
+    }
+    class Program
+    {    
         public static void startServer()
         {
-            // Establish a server connection
-            AsyncServer server = new AsyncServer();
+            SocketSetup socketSetup = new SocketSetup();
+            AsyncServer asyncServer = new AsyncServer(socketSetup.IPHostInfo, 
+                                                      socketSetup.IPHostAddress,
+                                                      socketSetup.IPHostEndPoint);
+            asyncServer.startListening();
         }
-
-        // Start a new client connection
         public static void startClient()
         {
-            // Create a new client
-            clientConnection[clientsConnected] = new AsyncClient(clientsConnected);
+            SocketSetup socketSetup = new SocketSetup();
+            AsyncClient asyncClient = new AsyncClient(socketSetup.IPHostInfo,
+                                                      socketSetup.IPHostAddress,
+                                                      socketSetup.IPHostEndPoint);
+            asyncClient.startConnection();
         }
-
         static void Main(string[] args)
         {
-            // Start a thread for the server
-            Thread serverThread = new Thread(startServer);
-            serverThread.Start();
+            Thread runServer = new Thread(startServer);
+            runServer.Start();
 
-            // Setup client connections
-            Thread[] clients = new Thread[MAX_CLIENTS];
-            
-            while (clientsConnected < MAX_CLIENTS)
-            {
-                mutex.WaitOne();
-                clients[clientsConnected] = new Thread(startClient);
-                clients[clientsConnected].Start();
-                Console.WriteLine("");
-                Thread.Sleep(1000);
-                mutex.ReleaseMutex();
-                clientsConnected++;
-            }
+            Thread.Sleep(1000);
+
+            Thread runClient = new Thread(startClient);
+            runClient.Start();
         }
     }
 }
