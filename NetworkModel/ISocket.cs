@@ -21,6 +21,31 @@ namespace NetworkProject
         void socketMessageHandler(Socket handler);
     }
 
+    public class SocketSetup
+    {
+        private static IPHostEntry ipHostInfo { get; set; }
+        private static IPAddress ipAddress { get; set; }
+        private static IPEndPoint ipEndPoint { get; set; }
+        public SocketSetup(string host, int port)
+        {
+            ipHostInfo = Dns.GetHostEntry(host);
+            ipAddress = ipHostInfo.AddressList[0];
+            ipEndPoint = new IPEndPoint(ipAddress, port);
+        }
+        public IPHostEntry IPHostInfo
+        {
+            get => ipHostInfo;
+        }
+        public IPAddress IPHostAddress
+        {
+            get => ipAddress;
+        }
+        public IPEndPoint IPHostEndPoint
+        {
+            get => ipEndPoint;
+        }
+    }
+
     public class bufferHandler
     {
         private Socket workSocket { get; set; }
@@ -35,36 +60,18 @@ namespace NetworkProject
         }
         public Socket WorkSocket
         {
-            get
-            {
-                return workSocket;
-            }
-            set
-            {
-                workSocket = value;
-            }
+            get => workSocket;
+            set => workSocket = value;
         }
         public byte[] WorkBuffer
         {
-            get
-            {
-                return workBuffer;
-            }
-            set
-            {
-                workBuffer = value;
-            }
+            get => workBuffer;
+            set => workBuffer = value;
         }
         public StringBuilder WorkString
         {
-            get
-            {
-                return workString;
-            }
-            set
-            {
-                workString = value;
-            }
+            get => workString;
+            set => workString = value;
         }
     }
 }

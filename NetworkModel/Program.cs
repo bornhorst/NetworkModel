@@ -1,51 +1,13 @@
-﻿using System;
-using System.Threading;
+﻿using System.Threading;
 using System.Net;
-using System.Net.Sockets;
 
 namespace NetworkProject
 {
-    public class SocketSetup
-    {
-        private static IPHostEntry ipHostInfo { get; set; }
-        private static IPAddress ipAddress { get; set; }
-        private static IPEndPoint ipEndPoint { get; set; }
-        public SocketSetup()
-        {
-            ipHostInfo = Dns.GetHostEntry(Dns.GetHostName());
-            ipAddress = ipHostInfo.AddressList[0];
-            ipEndPoint = new IPEndPoint(ipAddress, 59240);
-        }
-        public IPHostEntry IPHostInfo
-        {
-            get
-            {
-                return ipHostInfo;
-            }
-            set { }
-        }
-        public IPAddress IPHostAddress
-        {
-            get
-            {
-                return ipAddress;
-            }
-            set { }
-        }
-        public IPEndPoint IPHostEndPoint
-        {
-            get
-            {
-                return ipEndPoint;
-            }
-            set { }
-        }
-    }
     class Program
     {    
         public static void startServer()
         {
-            SocketSetup socketSetup = new SocketSetup();
+            SocketSetup socketSetup = new SocketSetup(Dns.GetHostName(), 59240);
             AsyncServer asyncServer = new AsyncServer(socketSetup.IPHostInfo, 
                                                       socketSetup.IPHostAddress,
                                                       socketSetup.IPHostEndPoint);
@@ -53,7 +15,7 @@ namespace NetworkProject
         }
         public static void startClient()
         {
-            SocketSetup socketSetup = new SocketSetup();
+            SocketSetup socketSetup = new SocketSetup(Dns.GetHostName(), 59240);
             AsyncClient asyncClient = new AsyncClient(socketSetup.IPHostInfo,
                                                       socketSetup.IPHostAddress,
                                                       socketSetup.IPHostEndPoint);
@@ -66,8 +28,11 @@ namespace NetworkProject
 
             Thread.Sleep(1000);
 
-            Thread runClient = new Thread(startClient);
-            runClient.Start();
+            Thread runClient1 = new Thread(startClient);
+            runClient1.Start();
+
+            Thread runClient2 = new Thread(startClient);
+            runClient2.Start();
         }
     }
 }
