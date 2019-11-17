@@ -1,16 +1,20 @@
 ﻿using System.Threading;
 using System.Net;
+using System.Collections.Generic;
 
 namespace NetworkProject
 {
     class Program
-    {    
+    {
+        private const int MAX_CLIENTS = 5;
+        
         public static void startServer()
         {
             SocketSetup socketSetup = new SocketSetup(Dns.GetHostName(), 59240);
             AsyncServer asyncServer = new AsyncServer(socketSetup.IPHostInfo, 
                                                       socketSetup.IPHostAddress,
-                                                      socketSetup.IPHostEndPoint);
+                                                      socketSetup.IPHostEndPoint,
+                                                      MAX_CLIENTS);
             asyncServer.startListening();
         }
         public static void startClient()
@@ -28,11 +32,13 @@ namespace NetworkProject
 
             Thread.Sleep(1000);
 
-            Thread runClient1 = new Thread(startClient);
-            runClient1.Start();
+            List<Thread> clientConnections = new List<Thread>(new Thread[MAX_CLIENTS]);
 
-            Thread runClient2 = new Thread(startClient);
-            runClient2.Start();
+            for(int i = 0; i < MAX_CLIENTS; i++)
+            {
+                clientConnections[i] = new Thread(startClient);
+                clientConnections[i].Start();
+            }
         }
     }
 }
