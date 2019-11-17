@@ -13,6 +13,7 @@ namespace NetworkProject
         private static ManualResetEvent acceptDone = new ManualResetEvent(false);
         private static ManualResetEvent sendDone = new ManualResetEvent(false);
         private static ManualResetEvent receiveDone = new ManualResetEvent(false);
+        private static ManualResetEvent connectDone = new ManualResetEvent(false);
 
         // Interface Properties
         public IPHostEntry IPHostInfo { get; set; }
@@ -20,24 +21,28 @@ namespace NetworkProject
         public IPEndPoint IPHostEndPoint { get; set; }
 
         // Socket for Server<->Client Communication
-        private Socket server = null;
+        private Socket server { get; set; }
+
+        // Received Message
+        private string receiveMessage { get; set; }
 
         // Maximum Clients
-        private const int MAX_CLIENTS = 2;
+        private int MAX_CLIENTS { get; set; }
 
         // Total Client Connections
-        private int clientCount = 0;
+        private static int clientCount { get; set; }
 
         // Use a Mutex for Threadsafe Data Handling
         private Mutex serverMutex = new Mutex();
 
         // Server Class Constructor
-        public AsyncServer(IPHostEntry iphostinfo, IPAddress iphostaddress, IPEndPoint iphostendpoint)
+        public AsyncServer(IPHostEntry iphostinfo, IPAddress iphostaddress, IPEndPoint iphostendpoint, int maxClients)
         {
             // Establish interface properties
             IPHostInfo = iphostinfo;
             IPHostAddress = iphostaddress;
             IPHostEndPoint = iphostendpoint;
+            MAX_CLIENTS = maxClients;
         }
 
         // Set up the server to listen for clients
@@ -69,7 +74,7 @@ namespace NetworkProject
                     server.BeginAccept(new AsyncCallback(acceptClient), server);
 
                     // Wait for connection setup before moving on
-                    acceptDone.WaitOne();                   
+                    acceptDone.WaitOne();
                 }
             } catch (Exception e)
             {
@@ -81,15 +86,17 @@ namespace NetworkProject
         public void acceptClient(IAsyncResult asyncResult)
         {
             serverMutex.WaitOne();
-            // Accept new clients or finish
-            acceptDone.Set();
+            clientCount += 1;
             
             Socket listener = (Socket)asyncResult.AsyncState;
             Socket handler = listener.EndAccept(asyncResult);
 
-            clientCount += 1;
             Console.WriteLine($"Server:> Clients connected -> {clientCount}");
+
+            // Accept new clients or finish
+            acceptDone.Set();
             serverMutex.ReleaseMutex();
+
             socketMessageHandler(handler);
         }
 
@@ -98,26 +105,35 @@ namespace NetworkProject
         {
             socketReceive(handler);
             receiveDone.WaitOne();
-            socketSend(handler, "Connection Accepted<EOF>");
+            receiveDone.Reset();
+            socketSend(handler, "Server:> Connection Accepted<EOF>");
             sendDone.WaitOne();
-            socketSend(handler, "Message1<EOF>");
+            sendDone.Reset();
+            socketReceive(handler);
+            receiveDone.WaitOne();
+            receiveDone.Reset();
+            socketSend(handler, "Server:> Message1<EOF>");
+            sendDone.WaitOne();
+            sendDone.Reset();
+            socketReceive(handler);
+            receiveDone.WaitOne();
+            receiveDone.Reset();
+            socketSend(handler, "Server:> Message2<EOF>");
+            sendDone.WaitOne();
+            sendDone.Reset();
+            socketReceive(handler);
+            receiveDone.WaitOne();
+            receiveDone.Reset();
+            socketSend(handler, "Server:> Message3<EOF>");
+            sendDone.WaitOne();
+            sendDone.Reset();
+            socketReceive(handler);
+            receiveDone.WaitOne();
+            receiveDone.Reset();
+            socketSend(handler, "Server:> Goodbye<EOF>");
             sendDone.WaitOne();
             socketReceive(handler);
             receiveDone.WaitOne();
-            socketSend(handler, "Message2<EOF>");
-            sendDone.WaitOne();
-            socketReceive(handler);
-            receiveDone.WaitOne();
-            socketSend(handler, "Message3<EOF>");
-            sendDone.WaitOne();
-            socketReceive(handler);
-            receiveDone.WaitOne();
-            socketSend(handler, "Finished<EOF>");
-            sendDone.WaitOne();
-            socketReceive(handler);
-            receiveDone.WaitOne();
-            socketSend(handler, "Goodbye<EOF>");
-            sendDone.WaitOne();
         }
 
         // Receive Data
@@ -140,7 +156,7 @@ namespace NetworkProject
         public void socketReceiveHandler(IAsyncResult asyncResult)
         {
             serverMutex.WaitOne();
-            String message;
+            receiveMessage = "";
             try
             {
                 bufferHandler socketBuffer = (bufferHandler)asyncResult.AsyncState;
@@ -150,22 +166,20 @@ namespace NetworkProject
                 {
                     socketBuffer.WorkString.Append(Encoding.ASCII.GetString(socketBuffer.WorkBuffer,
                                                                             0, bytesRead));
-                    message = socketBuffer.WorkString.ToString();
-                    if (message.IndexOf("<EOF>") > -1)
+                    receiveMessage = socketBuffer.WorkString.ToString();
+                    if (receiveMessage.Contains("<EOF>"))
                     {
                         Console.WriteLine($"Server:> Read {bytesRead} bytes from socket.");
-                        Console.WriteLine($"Server:> Data Read: {message}.");
+                        Console.WriteLine($"Server:> Data Read: {receiveMessage}.");
                         receiveDone.Set();
+                        Thread.Sleep(500);
                     }
                     else
                     {
                         handler.BeginReceive(socketBuffer.WorkBuffer, 0, bufferHandler.bufferSize, 0,
                                              new AsyncCallback(socketReceiveHandler), socketBuffer);
                     }
-                } else
-                {
-                    receiveDone.Set();
-                }
+                } 
             } catch (Exception e)
             {
                 Console.WriteLine(e.ToString());
@@ -185,6 +199,7 @@ namespace NetworkProject
             // Start the transaction
             handler.BeginSend(byteData, 0, byteData.Length, 0,
                               new AsyncCallback(socketSendHandler), handler);
+
         }
 
         // Handle sending data to the client
@@ -198,9 +213,11 @@ namespace NetworkProject
                 // Send out new data to the client
                 int bytesSent = handler.EndSend(asyncResult);
                 Console.WriteLine("Server:> Sent {0} bytes to client.", bytesSent);
-                sendDone.Set();
 
-            } catch(Exception e)
+                sendDone.Set();
+                Thread.Sleep(500);
+            }
+            catch (Exception e)
             {
                 Console.WriteLine(e.ToString());
             }
