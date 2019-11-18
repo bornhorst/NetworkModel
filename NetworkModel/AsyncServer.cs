@@ -104,48 +104,32 @@ namespace NetworkProject
         public void socketMessageHandler(Socket handler)
         {
             socketReceive(handler);
-            receiveDone.WaitOne();
-            receiveDone.Reset();
             socketSend(handler, "Server:> Connection Accepted<EOF>");
-            sendDone.WaitOne();
-            sendDone.Reset();
             socketReceive(handler);
-            receiveDone.WaitOne();
-            receiveDone.Reset();
             socketSend(handler, "Server:> Message1<EOF>");
-            sendDone.WaitOne();
-            sendDone.Reset();
             socketReceive(handler);
-            receiveDone.WaitOne();
-            receiveDone.Reset();
             socketSend(handler, "Server:> Message2<EOF>");
-            sendDone.WaitOne();
-            sendDone.Reset();
             socketReceive(handler);
-            receiveDone.WaitOne();
-            receiveDone.Reset();
             socketSend(handler, "Server:> Message3<EOF>");
-            sendDone.WaitOne();
-            sendDone.Reset();
             socketReceive(handler);
-            receiveDone.WaitOne();
-            receiveDone.Reset();
             socketSend(handler, "Server:> Goodbye<EOF>");
-            sendDone.WaitOne();
             socketReceive(handler);
-            receiveDone.WaitOne();
         }
 
         // Receive Data
         public void socketReceive(Socket handler)
         {
             try
-            {            
+            {
+                receiveDone.Reset();
+
                 bufferHandler socketBuffer = new bufferHandler();
                 socketBuffer.WorkSocket = handler;
                 handler.BeginReceive(socketBuffer.WorkBuffer, 0, bufferHandler.bufferSize, 0,
                                      new AsyncCallback(socketReceiveHandler), socketBuffer);
-                
+
+                receiveDone.WaitOne();
+
             } catch (Exception e)
             {
                 Console.WriteLine(e.ToString());
@@ -171,8 +155,9 @@ namespace NetworkProject
                     {
                         Console.WriteLine($"Server:> Read {bytesRead} bytes from socket.");
                         Console.WriteLine($"Server:> Data Read: {receiveMessage}.");
-                        receiveDone.Set();
+
                         Thread.Sleep(500);
+                        receiveDone.Set();
                     }
                     else
                     {
@@ -193,6 +178,8 @@ namespace NetworkProject
         // Send data as byte array
         public void socketSend(Socket handler, String data)
         {
+            sendDone.Reset();
+
             // Convert string to bytes
             byte[] byteData = Encoding.ASCII.GetBytes(data);
 
@@ -200,6 +187,7 @@ namespace NetworkProject
             handler.BeginSend(byteData, 0, byteData.Length, 0,
                               new AsyncCallback(socketSendHandler), handler);
 
+            sendDone.WaitOne();
         }
 
         // Handle sending data to the client
@@ -214,8 +202,8 @@ namespace NetworkProject
                 int bytesSent = handler.EndSend(asyncResult);
                 Console.WriteLine("Server:> Sent {0} bytes to client.", bytesSent);
 
-                sendDone.Set();
                 Thread.Sleep(500);
+                sendDone.Set();
             }
             catch (Exception e)
             {

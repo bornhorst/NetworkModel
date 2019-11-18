@@ -20,16 +20,16 @@ namespace NetworkProject
         public IPEndPoint IPHostEndPoint { get; set; }
 
         // Socket for Client<->Server Communication
-        private Socket client = null;
+        private Socket client { get; set; }
 
         // Received Message
-        private string receiveMessage = "";
+        private string receiveMessage { get; set; }
 
         // Number of Clients on Server
-        private static int clientCount;
+        private static int clientCount { get; set; }
 
         // This Client's Number
-        private int clientNumber;
+        private int clientNumber { get; set; }
 
         // Use a Mutex for Threadsafe Data Handling
         private Mutex clientMutex = new Mutex();
@@ -57,8 +57,11 @@ namespace NetworkProject
                 client = new Socket(IPHostAddress.AddressFamily, SocketType.Stream,
                                     ProtocolType.Tcp);
 
+                connectDone.Reset();
+
                 // Connect to the endpoint
                 client.BeginConnect(IPHostEndPoint, new AsyncCallback(connectServer), client);
+
                 connectDone.WaitOne();
 
                 socketMessageHandler(client);
@@ -73,36 +76,16 @@ namespace NetworkProject
         public void socketMessageHandler(Socket handler)
         {
             socketSend(handler, "Client" + clientNumber + ":> Connection Request<EOF>");
-            sendDone.WaitOne();
-            sendDone.Reset();
             socketReceive(handler);
-            receiveDone.WaitOne();
-            receiveDone.Reset();
             socketSend(handler, "Client" + clientNumber + ":> Message1<EOF>");
-            sendDone.WaitOne();
-            sendDone.Reset();
             socketReceive(handler);
-            receiveDone.WaitOne();
-            receiveDone.Reset();
             socketSend(handler, "Client" + clientNumber + ":> Message2<EOF>");
-            sendDone.WaitOne();
-            sendDone.Reset();
             socketReceive(handler);
-            receiveDone.WaitOne();
-            receiveDone.Reset();
             socketSend(handler, "Client" + clientNumber + ":> Message3<EOF>");
-            sendDone.WaitOne();
-            sendDone.Reset();
             socketReceive(handler);
-            receiveDone.WaitOne();
-            receiveDone.Reset();
             socketSend(handler, "Client" + clientNumber + ":> Finished<EOF>");
-            sendDone.WaitOne();
-            sendDone.Reset();
             socketReceive(handler);
-            receiveDone.WaitOne();
             socketSend(handler, "Client" + clientNumber + ":> Logging Off<EOF>");
-            sendDone.WaitOne();
         }
 
         // Establish a connection to the server
@@ -131,10 +114,14 @@ namespace NetworkProject
         {
             try
             {
+                receiveDone.Reset();
+
                 bufferHandler socketBuffer = new bufferHandler();
                 socketBuffer.WorkSocket = handler;
                 handler.BeginReceive(socketBuffer.WorkBuffer, 0, bufferHandler.bufferSize, 0,
                                      new AsyncCallback(socketReceiveHandler), socketBuffer);
+
+                receiveDone.WaitOne();
             }
             catch (Exception e)
             {
@@ -161,9 +148,9 @@ namespace NetworkProject
                     if (receiveMessage.Contains("<EOF>"))
                     {
                         Console.WriteLine($"Client{clientNumber}:> Read {bytesRead} bytes from socket.");
-                        Console.WriteLine($"Client{clientNumber}:> Data Read: {receiveMessage}.");                    
+                        Console.WriteLine($"Client{clientNumber}:> Data Read: {receiveMessage}.");
+
                         receiveDone.Set();
-                        Thread.Sleep(500);
                     }
                     else
                     {
@@ -185,12 +172,16 @@ namespace NetworkProject
         // Send data as byte array
         public void socketSend(Socket handler, String data)
         {
+            sendDone.Reset();
+
             // Convert string to bytes
             byte[] byteData = Encoding.ASCII.GetBytes(data);
 
             // Start the transaction
             handler.BeginSend(byteData, 0, byteData.Length, 0,
                               new AsyncCallback(socketSendHandler), handler);
+
+            sendDone.WaitOne();
         }
 
         // Handle sending data to the client
@@ -206,7 +197,6 @@ namespace NetworkProject
                 Console.WriteLine("Client{0}:> Sent {1} bytes to server.", clientNumber, bytesSent);
 
                 sendDone.Set();
-                Thread.Sleep(500);
             }
             catch (Exception e)
             {
