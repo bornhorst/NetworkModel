@@ -6,9 +6,11 @@ namespace NetworkProject
 {
     class Program
     {
-        private const int MAX_CLIENTS = 5;
+        // Total # of Connecting Clients
+        private const int MAX_CLIENTS = 100;
 
-        private static ManualResetEvent clientStartDone = new ManualResetEvent(false);
+        // Allow Connections to be Asynchronous
+        private static AutoResetEvent clientStartDone = new AutoResetEvent(false);
 
         public static void startServer()
         {
@@ -41,7 +43,6 @@ namespace NetworkProject
 
             for(int i = 0; i < MAX_CLIENTS; i++)
             {
-                clientStartDone.Reset();
                 clientConnections[i] = new Thread(startClient);
                 clientConnections[i].Start();
                 clientStartDone.WaitOne();

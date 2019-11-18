@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Text;
 using System.Net;
 using System.Net.Sockets;
@@ -10,10 +9,9 @@ namespace NetworkProject
     public class AsyncServer : ISocket
     {
         // Setup ManualResetEvent Signals
-        private static ManualResetEvent acceptDone = new ManualResetEvent(false);
-        private static ManualResetEvent sendDone = new ManualResetEvent(false);
-        private static ManualResetEvent receiveDone = new ManualResetEvent(false);
-        private static ManualResetEvent connectDone = new ManualResetEvent(false);
+        private static AutoResetEvent acceptDone = new AutoResetEvent(false);
+        private static AutoResetEvent sendDone = new AutoResetEvent(false);
+        private static AutoResetEvent receiveDone = new AutoResetEvent(false);
 
         // Interface Properties
         public IPHostEntry IPHostInfo { get; set; }
@@ -66,9 +64,6 @@ namespace NetworkProject
 
                 while (clientCount < MAX_CLIENTS)
                 {
-                    // Set to reset state
-                    acceptDone.Reset();
-
                     // Start asynchronous listener
                     Console.WriteLine("Server:> Listening for connections...");
                     server.BeginAccept(new AsyncCallback(acceptClient), server);
@@ -95,9 +90,11 @@ namespace NetworkProject
 
             // Accept new clients or finish
             acceptDone.Set();
+
             serverMutex.ReleaseMutex();
 
             socketMessageHandler(handler);
+            
         }
 
         // Handle Messages After Connection Established
@@ -119,10 +116,9 @@ namespace NetworkProject
         // Receive Data
         public void socketReceive(Socket handler)
         {
+            serverMutex.WaitOne();
             try
             {
-                receiveDone.Reset();
-
                 bufferHandler socketBuffer = new bufferHandler();
                 socketBuffer.WorkSocket = handler;
                 handler.BeginReceive(socketBuffer.WorkBuffer, 0, bufferHandler.bufferSize, 0,
@@ -134,12 +130,15 @@ namespace NetworkProject
             {
                 Console.WriteLine(e.ToString());
             }
+            finally
+            {
+                serverMutex.ReleaseMutex();
+            }
         }
 
         // Handle Receiving Data
         public void socketReceiveHandler(IAsyncResult asyncResult)
         {
-            serverMutex.WaitOne();
             receiveMessage = "";
             try
             {
@@ -153,10 +152,9 @@ namespace NetworkProject
                     receiveMessage = socketBuffer.WorkString.ToString();
                     if (receiveMessage.Contains("<EOF>"))
                     {
-                        Console.WriteLine($"Server:> Read {bytesRead} bytes from socket.");
+                        // Console.WriteLine($"Server:> Read {bytesRead} bytes from socket.");
                         Console.WriteLine($"Server:> Data Read: {receiveMessage}.");
 
-                        Thread.Sleep(500);
                         receiveDone.Set();
                     }
                     else
@@ -169,16 +167,12 @@ namespace NetworkProject
             {
                 Console.WriteLine(e.ToString());
             }
-            finally
-            {
-                serverMutex.ReleaseMutex();
-            }
         }
 
         // Send data as byte array
         public void socketSend(Socket handler, String data)
         {
-            sendDone.Reset();
+            serverMutex.WaitOne();
 
             // Convert string to bytes
             byte[] byteData = Encoding.ASCII.GetBytes(data);
@@ -188,6 +182,8 @@ namespace NetworkProject
                               new AsyncCallback(socketSendHandler), handler);
 
             sendDone.WaitOne();
+
+            serverMutex.ReleaseMutex();
         }
 
         // Handle sending data to the client
@@ -200,9 +196,8 @@ namespace NetworkProject
 
                 // Send out new data to the client
                 int bytesSent = handler.EndSend(asyncResult);
-                Console.WriteLine("Server:> Sent {0} bytes to client.", bytesSent);
+                // Console.WriteLine("Server:> Sent {0} bytes to client.", bytesSent);
 
-                Thread.Sleep(500);
                 sendDone.Set();
             }
             catch (Exception e)
