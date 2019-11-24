@@ -34,13 +34,14 @@ namespace NetworkProject
         private Mutex clientMutex = new Mutex();
 
         // Client Constructor
-        public AsyncClient(IPHostEntry iphostinfo, IPAddress iphostaddress, IPEndPoint iphostendpoint)
+        public AsyncClient(string host, int port)
         {
             // Establish Interface
             clientMutex.WaitOne();
-            IPHostInfo = iphostinfo;
-            IPHostAddress = iphostaddress;
-            IPHostEndPoint = iphostendpoint;
+            SocketSetup clientSetup = new SocketSetup(host, port);
+            IPHostInfo = clientSetup.IPHostInfo;
+            IPHostAddress = clientSetup.IPHostAddress;
+            IPHostEndPoint = clientSetup.IPHostEndPoint;
             clientCount += 1;
             clientNumber = clientCount;
             Console.WriteLine($"Clients Connected: {clientCount.ToString()} Client Number: {clientNumber.ToString()}");

@@ -34,12 +34,13 @@ namespace NetworkProject
         private Mutex serverMutex = new Mutex();
 
         // Server Class Constructor
-        public AsyncServer(IPHostEntry iphostinfo, IPAddress iphostaddress, IPEndPoint iphostendpoint, int maxClients)
+        public AsyncServer(string host, int port, int maxClients)
         {
+            SocketSetup serverSetup = new SocketSetup(host, port);
             // Establish interface properties
-            IPHostInfo = iphostinfo;
-            IPHostAddress = iphostaddress;
-            IPHostEndPoint = iphostendpoint;
+            IPHostInfo = serverSetup.IPHostInfo;
+            IPHostAddress = serverSetup.IPHostAddress;
+            IPHostEndPoint = serverSetup.IPHostEndPoint;
             MAX_CLIENTS = maxClients;
         }
 
