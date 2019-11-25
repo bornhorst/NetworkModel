@@ -8,7 +8,7 @@ namespace NetworkProject
 {
     public class AsyncClient : ISocket
     {
-        // Setup ManualResetEvent Signals
+        // Setup AutoResetEvent Signals
         private AutoResetEvent connectDone = new AutoResetEvent(false);
         private AutoResetEvent sendDone = new AutoResetEvent(false);
         private AutoResetEvent receiveDone = new AutoResetEvent(false);
@@ -36,19 +36,23 @@ namespace NetworkProject
         // Client Constructor
         public AsyncClient(string host, int port)
         {
-            // Establish Interface
             clientMutex.WaitOne();
+
+            // Connect to Network
             SocketSetup clientSetup = new SocketSetup(host, port);
+
+            // Establish Interface Properties
             IPHostInfo = clientSetup.IPHostInfo;
             IPHostAddress = clientSetup.IPHostAddress;
             IPHostEndPoint = clientSetup.IPHostEndPoint;
+
             clientCount += 1;
             clientNumber = clientCount;
             Console.WriteLine($"Clients Connected: {clientCount.ToString()} Client Number: {clientNumber.ToString()}");
             clientMutex.ReleaseMutex();
         }
 
-        // Start client and establish connection
+        // Setup a Client Connection with Server
         public void startConnection()
         {
             try
@@ -86,7 +90,7 @@ namespace NetworkProject
             socketSend(handler, "Client" + clientNumber + ":> Logging Off<EOF>");
         }
 
-        // Establish a connection to the server
+        // Handle Client Connection with Server
         private void connectServer(IAsyncResult asyncResult)
         {
             clientMutex.WaitOne();
@@ -167,7 +171,7 @@ namespace NetworkProject
             }
         }
 
-        // Send data as byte array
+        // Send Data
         public void socketSend(Socket handler, String data)
         {
             clientMutex.WaitOne();
@@ -184,7 +188,7 @@ namespace NetworkProject
             clientMutex.ReleaseMutex();
         }
 
-        // Handle sending data to the client
+        // Handle Sending Data to the Server
         public void socketSendHandler(IAsyncResult asyncResult)
         {
             try

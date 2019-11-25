@@ -26,6 +26,8 @@ namespace NetworkProject
         private static IPHostEntry ipHostInfo { get; set; }
         private static IPAddress ipAddress { get; set; }
         private static IPEndPoint ipEndPoint { get; set; }
+
+        // Used to Connect a Server/Client to a Network
         public SocketSetup(string host, int port)
         {
             ipHostInfo = Dns.GetHostEntry(host);
@@ -46,6 +48,7 @@ namespace NetworkProject
         }
     }
 
+    // Used to Setup the Buffers for Server/Client Messages
     public class bufferHandler
     {
         private Socket workSocket { get; set; }
