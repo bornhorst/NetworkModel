@@ -8,7 +8,7 @@ namespace NetworkProject
 {
     public class AsyncServer : ISocket
     {
-        // Setup ManualResetEvent Signals
+        // Setup AutoResetEvent Signals
         private static AutoResetEvent acceptDone = new AutoResetEvent(false);
         private static AutoResetEvent sendDone = new AutoResetEvent(false);
         private static AutoResetEvent receiveDone = new AutoResetEvent(false);
@@ -36,7 +36,9 @@ namespace NetworkProject
         // Server Class Constructor
         public AsyncServer(string host, int port, int maxClients)
         {
+            // Connect to Network
             SocketSetup serverSetup = new SocketSetup(host, port);
+
             // Establish interface properties
             IPHostInfo = serverSetup.IPHostInfo;
             IPHostAddress = serverSetup.IPHostAddress;
@@ -44,7 +46,7 @@ namespace NetworkProject
             MAX_CLIENTS = maxClients;
         }
 
-        // Set up the server to listen for clients
+        // Set Up the Server to Listen for Clients
         public void startListening()
         {
             // Create the TCP/IP socket
@@ -78,7 +80,7 @@ namespace NetworkProject
             }
         }
 
-        // Allow server to accept incoming connection
+        // Server Accepts Incoming Client Connection
         public void acceptClient(IAsyncResult asyncResult)
         {
             serverMutex.WaitOne();
@@ -170,7 +172,7 @@ namespace NetworkProject
             }
         }
 
-        // Send data as byte array
+        // Send Data
         public void socketSend(Socket handler, String data)
         {
             serverMutex.WaitOne();
@@ -187,7 +189,7 @@ namespace NetworkProject
             serverMutex.ReleaseMutex();
         }
 
-        // Handle sending data to the client
+        // Handle Sending Data to Client
         public void socketSendHandler(IAsyncResult asyncResult)
         {
             try
